@@ -1,0 +1,105 @@
+---
+title: "Coursera Assignment - Predictions using the Weight Lifting Exercises Dataset"
+author: "Aniket Kumar"
+date: "10/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary
+
+In this project, I have used the data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The data consists of a Training data and a Test data (to be used to validate the selected model).
+
+The goal of our project is to predict the manner in which they did the exercise. There is this “classe” variable in the training set.
+
+Note: The dataset used in this project is a courtesy of “Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers’ Data Classification of Body Postures and Movements”
+
+```{r, echo = FALSE}
+if(!file.exists("pml-training.csv"))
+{
+  download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "pml-training.csv", method = 'curl')
+}
+main_dataset <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+if(!file.exists("pml-testing.csv"))
+{
+  download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "pml-testing.csv", method = 'curl')
+}
+validation_dataset <- read.csv("pml-testing.csv")
+```
+
+#Loading the necessary pakages
+```{r}
+library(caret)
+library(randomForest)
+library(rattle)
+
+```
+
+```{r}
+set.seed(1058)
+```
+
+Preparing the data for prediction by splitting the training data into 70% as train data and rest 30% as test data. This splitting will server also to compute the out-of-sample errors.
+
+```{r}
+Train = createDataPartition(y=main_dataset$classe, p=0.7, list=FALSE)
+training_data = main_dataset[Train,]
+testing_data = main_dataset[-Train,]
+```
+
+Cleaning the data by removing NA values. NA means not any. Such records need to be removed from our dataset. Hence, cleaning the data is the next step after preprocessing it.
+
+```{r}
+naCol = sapply(training_data, function(x) {sum(is.na(x))}) 
+
+
+columnsNA = names(naCol[naCol > 0]) #Vector with all the columns that has NA values
+training_data = training_data[, !names(training_data) %in% columnsNA] #Remove those columns from the training set
+names(training_data)
+
+##CLeaning the data further
+training_data <- training_data[, !names(training_data) %in% c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")]
+```
+
+Repeating the same for the validation dataset.
+
+```{r}
+naCol = sapply(validation_dataset, function(x) {sum(is.na(x))}) #Make a vector of all the columns and the number of NA entries
+columnsNA = names(naCol[naCol > 0]) #Vector with all the columns that has NA values
+validation_dataset = validation_dataset[, !names(validation_dataset) %in% columnsNA] #Remove those columns from the training set.
+validation_dataset <- validation_dataset[, !names(validation_dataset) %in% c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")]
+```
+
+Repeating for the testing dataset.
+
+```{r}
+naCols = sapply(testing_data, function(x) {sum(is.na(x))}) 
+columnsNA = names(naCol[naCol > 0])
+testing_data = testing_data[, !names(testing_data) %in% columnsNA] 
+testing_data <- testing_data[, !names(testing_data) %in% c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")]
+```
+
+Building the prediction model using Random forest.
+Random forest algorithm can be used for both classifications and regression task. Random forest classifier will handle the missing values and maintain the accuracy of a large proportion of data. It provides higher accuracy through cross validation. 
+
+
+```{r acc}
+new_model <- randomForest(classe ~ .,   data=training_data, ntree = 50)
+predictions_obtd <- predict(new_model, testing_data)
+
+model_accuracy <- confusionMatrix(predictions_obtd, testing_data$classe)$overall[[1]]
+```
+
+Thus, the model is `r model_accuracy` accurate!
+
+Now, to predict the unknown classes of the validation set, we'll use the 'predict' function.
+
+```{r}
+predictions_obtd <- predict(new_model, validation_dataset)
+predictions_obtd
+```
